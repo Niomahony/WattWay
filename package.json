@@ -1,7 +1,7 @@
 {
   "name": "wattway",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "app/index.ts",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -9,7 +9,15 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@react-navigation/native": "^7.0.14",
+    "@react-navigation/stack": "^7.1.1",
+    "@rnmapbox/maps": "^10.1.33",
+    "@youssefhenna/expo-mapbox-navigation": "^1.0.0",
     "expo": "~52.0.23",
+    "expo-dev-client": "~5.0.8",
+    "expo-location": "^18.0.4",
+    "expo-router": "^4.0.15",
+    "expo-splash-screen": "^0.29.18",
     "expo-status-bar": "~2.0.0",
     "react": "18.3.1",
     "react-native": "0.76.5"
