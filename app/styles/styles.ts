@@ -111,4 +111,79 @@ export const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
   },
+
+  evMarker: {
+    backgroundColor: "green",
+    padding: 15,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    width: 60,
+    height: 60,
+  },
+
+  evMarkerText: {
+    fontSize: 24,
+    color: "white",
+    fontWeight: "bold",
+  },
+
+  chargerList: {
+    position: "absolute",
+    bottom: 100,
+    left: 10,
+    right: 10,
+    backgroundColor: "white",
+    borderRadius: 10,
+    padding: 10,
+    maxHeight: 200,
+    elevation: 5,
+    zIndex: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+
+  chargerItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+    alignItems: "center",
+  },
+
+  chargerText: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  popupContainer: {
+    position: "absolute",
+    bottom: 50,
+    left: 10,
+    right: 10,
+    backgroundColor: "white",
+    padding: 15,
+    borderRadius: 10,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    alignItems: "center",
+  },
+
+  navigateButton: {
+    backgroundColor: "blue",
+    padding: 12,
+    marginTop: 10,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+
+  navigateButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
 });

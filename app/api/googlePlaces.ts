@@ -105,3 +105,86 @@ export async function calculateDrivingDistance(
     return "Error calculating driving distance";
   }
 }
+
+export const fetchEVChargersAlongRoute = async (
+  routeCoordinates: { latitude: number; longitude: number }[]
+) => {
+  let results: any[] = [];
+
+  for (let i = 0; i < routeCoordinates.length; i += 5) {
+    const { latitude, longitude } = routeCoordinates[i];
+
+    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=2000&type=charging_station&key=${googlePlacesApiKey}`;
+
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      if (data.results) {
+        results.push(...data.results);
+      }
+    } catch (error) {
+      console.error("Error fetching EV chargers:", error);
+    }
+  }
+
+  return results;
+};
+
+export const fetchEVChargers = async (coords: [number, number]) => {
+  const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${coords[1]},${coords[0]}&radius=5000&type=charging_station&key=${googlePlacesApiKey}`;
+
+  try {
+    const response = await fetch(url);
+    const jsonData = await response.json();
+
+    if (!jsonData.results) {
+      return [];
+    }
+
+    interface Charger {
+      name: string;
+      lat: number;
+      lng: number;
+      place_id: string;
+      open_now: boolean | "Unknown";
+      rating: number | "No rating";
+      total_ratings: number;
+      type: "Fast Charger" | "Standard Charger";
+    }
+
+    interface ChargerResponse {
+      name: string;
+      geometry: {
+        location: {
+          lat: number;
+          lng: number;
+        };
+      };
+      place_id: string;
+      opening_hours?: {
+        open_now: boolean;
+      };
+      rating?: number;
+      user_ratings_total?: number;
+      types: string[];
+    }
+
+    return jsonData.results.map(
+      (charger: ChargerResponse): Charger => ({
+        name: charger.name,
+        lat: charger.geometry.location.lat,
+        lng: charger.geometry.location.lng,
+        place_id: charger.place_id,
+        open_now: charger.opening_hours?.open_now ?? "Unknown",
+        rating: charger.rating ?? "No rating",
+        total_ratings: charger.user_ratings_total ?? 0,
+        type: charger.types.includes("fast_charging")
+          ? "Fast Charger"
+          : "Standard Charger",
+      })
+    );
+  } catch (error) {
+    console.error("Error fetching EV chargers:", error);
+    return [];
+  }
+};

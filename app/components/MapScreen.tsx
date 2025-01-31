@@ -2,17 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   SafeAreaView,
   Alert,
-  AppState,
   Text,
   View,
   TouchableOpacity,
 } from "react-native";
 import * as Location from "expo-location";
-import {
-  fetchPlaceDetails,
-  fetchPlaceDetailsByCoordinates,
-  calculateDrivingDistance,
-} from "../api/googlePlaces";
+import { fetchEVChargers, calculateDrivingDistance } from "../api/googlePlaces";
 import { SearchBar } from "./SearchBar";
 import { PlaceInfoBox } from "../components/PlaceInfoBox";
 import { styles } from "../styles/styles";
@@ -32,31 +27,23 @@ export default function MapScreen() {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(
     null
   );
-  const [pinCoordinate, setPinCoordinate] = useState<[number, number] | null>(
-    null
-  );
-  const [placeInfo, setPlaceInfo] = useState<{
+  const [evChargers, setEvChargers] = useState<any[]>([]);
+  const [selectedCharger, setSelectedCharger] = useState<any | null>(null);
+  const [searchedLocation, setSearchedLocation] = useState<{
     name: string;
-    photoUrl: string | null;
-    distance: string;
+    coordinates: [number, number];
   } | null>(null);
-  const [isAppActive, setIsAppActive] = useState(true);
-  const [showSearchSuggestions, setShowSearchSuggestions] = useState(true);
+  const [currentZoom, setCurrentZoom] = useState(12);
+  const [lastFetchedCenter, setLastFetchedCenter] = useState<
+    [number, number] | null
+  >(null);
 
   const mapRef = useRef<MapboxGL.MapView>(null);
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   useEffect(() => {
-    const appStateListener = AppState.addEventListener(
-      "change",
-      (nextAppState) => {
-        setIsAppActive(nextAppState === "active");
-      }
-    );
-
     getUserLocation();
-    return () => appStateListener.remove();
   }, []);
 
   const getUserLocation = async () => {
@@ -74,8 +61,10 @@ export default function MapScreen() {
         location.coords.longitude,
         location.coords.latitude,
       ];
+
       setUserLocation(coords);
       setCenterCoordinate(coords);
+      if (currentZoom >= 12) fetchChargersNear(coords);
 
       cameraRef.current?.setCamera({
         centerCoordinate: coords,
@@ -87,109 +76,91 @@ export default function MapScreen() {
     }
   };
 
-  const handleMapPress = async (e: any) => {
-    if (!isAppActive) return;
-    const [longitude, latitude] = e.geometry.coordinates;
-    setPinCoordinate([longitude, latitude]);
-    setShowSearchSuggestions(false);
-    setPlaceInfo({
-      name: "Unknown",
-      photoUrl: null,
-      distance: "Calculating...",
-    });
+  const fetchChargersNear = async (coords: [number, number]) => {
+    if (!coords || currentZoom < 12) return;
+
+    const distanceThreshold = 0.05;
+    if (
+      lastFetchedCenter &&
+      Math.abs(coords[0] - lastFetchedCenter[0]) < distanceThreshold &&
+      Math.abs(coords[1] - lastFetchedCenter[1]) < distanceThreshold
+    ) {
+      return;
+    }
+
+    setLastFetchedCenter(coords);
 
     try {
-      const placeDetails = await fetchPlaceDetailsByCoordinates(
-        latitude,
-        longitude
-      );
-      let distance = "Distance not available";
-      if (userLocation) {
-        distance = await calculateDrivingDistance(userLocation, [
-          longitude,
-          latitude,
-        ]);
-      }
-      setPlaceInfo({
-        name: placeDetails?.name || "Unknown",
-        photoUrl: placeDetails?.photoUrl || null,
-        distance,
-      });
+      const chargers = await fetchEVChargers(coords);
+      setEvChargers(chargers || []);
     } catch (error) {
-      setPlaceInfo({
-        name: "Unknown",
-        photoUrl: null,
-        distance: "Error calculating distance",
-      });
+      console.error("Error fetching chargers:", error);
     }
   };
 
-  const handleSuggestionSelect = async (placeId: string) => {
-    setShowSearchSuggestions(false);
+  const handleMapChange = async () => {
+    if (!mapRef.current) return;
     try {
-      const placeDetails = await fetchPlaceDetails(placeId);
-      if (placeDetails) {
-        setPinCoordinate(placeDetails.coordinates as [number, number]);
-        setCenterCoordinate(placeDetails.coordinates as [number, number]);
+      const newCenter = await mapRef.current.getCenter();
+      const newZoom = await mapRef.current.getZoom();
+      setCurrentZoom(newZoom);
 
-        if (userLocation) {
-          const distance = await calculateDrivingDistance(
-            userLocation,
-            placeDetails.coordinates as [number, number]
-          );
-          setPlaceInfo({
-            name: placeDetails.name,
-            photoUrl: placeDetails.photoUrl,
-            distance,
-          });
-        }
+      if (newZoom >= 12) {
+        fetchChargersNear([newCenter[0], newCenter[1]]);
+      } else {
+        setEvChargers([]);
       }
     } catch (error) {
-      Alert.alert("Error", "Could not fetch location details.");
+      console.error("Error getting map details:", error);
+    }
+  };
+
+  const handleSelectCharger = async (charger: any) => {
+    if (!userLocation) return;
+
+    try {
+      const distance = await calculateDrivingDistance(userLocation, [
+        charger.lng,
+        charger.lat,
+      ]);
+      setSelectedCharger({
+        ...charger,
+        distance,
+      });
+    } catch (error) {
+      console.error("Error calculating distance:", error);
+      setSelectedCharger({
+        ...charger,
+        distance: "Unknown distance",
+      });
     }
   };
 
   const handleStartNavigation = () => {
-    if (userLocation && pinCoordinate) {
-      navigation.navigate("NavigationScreen", {
-        coordinates: [
-          { latitude: userLocation[1], longitude: userLocation[0] },
-          { latitude: pinCoordinate[1], longitude: pinCoordinate[0] },
-        ],
-      });
-    } else {
-      Alert.alert("Error", "Please select a destination first!");
+    if (!userLocation || !searchedLocation) {
+      Alert.alert("Error", "Please select a destination first.");
+      return;
     }
-  };
 
-  const handleClearPin = () => {
-    setPinCoordinate(null);
-    setPlaceInfo(null);
-  };
-
-  const resetCameraToUserLocation = () => {
-    if (userLocation) {
-      cameraRef.current?.setCamera({
-        centerCoordinate: userLocation,
-        zoomLevel: 12,
-        animationDuration: 1000,
-      });
-    } else {
-      Alert.alert("Error", "User location not available.");
-    }
+    navigation.navigate("NavigationScreen", {
+      coordinates: [
+        { latitude: userLocation[1], longitude: userLocation[0] },
+        {
+          latitude: searchedLocation.coordinates[1],
+          longitude: searchedLocation.coordinates[0],
+        },
+      ],
+    });
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <SearchBar
-        onSuggestionSelect={handleSuggestionSelect}
-        showSuggestions={showSearchSuggestions}
-      />
+      <SearchBar onSuggestionSelect={setSearchedLocation} />
 
       <MapboxGL.MapView
         ref={mapRef}
         style={styles.map}
-        onPress={handleMapPress}
+        onRegionDidChange={handleMapChange}
       >
         <MapboxGL.Camera
           ref={cameraRef}
@@ -197,7 +168,6 @@ export default function MapScreen() {
           zoomLevel={12}
         />
 
-        {}
         {userLocation && (
           <MapboxGL.PointAnnotation id="userLocation" coordinate={userLocation}>
             <View style={styles.emojiMarker}>
@@ -206,45 +176,81 @@ export default function MapScreen() {
           </MapboxGL.PointAnnotation>
         )}
 
-        {}
-        {pinCoordinate && (
-          <MapboxGL.PointAnnotation id="pinLocation" coordinate={pinCoordinate}>
-            <View style={styles.defaultPin}>
-              <Text style={styles.pinText}>📍</Text>
-            </View>
-          </MapboxGL.PointAnnotation>
-        )}
+        {currentZoom >= 12 &&
+          evChargers.map((charger) => (
+            <MapboxGL.PointAnnotation
+              key={`ev-${charger.place_id}`}
+              id={`ev-${charger.place_id}`}
+              coordinate={[charger.lng, charger.lat]}
+              onSelected={() => handleSelectCharger(charger)}
+            >
+              <View style={styles.evMarker}>
+                <Text style={styles.evMarkerText}>⚡</Text>
+              </View>
+            </MapboxGL.PointAnnotation>
+          ))}
       </MapboxGL.MapView>
 
-      {}
-      <TouchableOpacity
-        style={styles.resetButton}
-        onPress={resetCameraToUserLocation}
-      >
-        <Text style={styles.resetButtonText}>📍</Text>
-      </TouchableOpacity>
-
-      {pinCoordinate && (
-        <View>
+      {searchedLocation && (
+        <View style={styles.popupContainer}>
+          <PlaceInfoBox
+            name={searchedLocation.name}
+            photoUrl={null}
+            distance={"Unknown distance"}
+          />
           <TouchableOpacity
-            style={styles.actionButton}
+            style={styles.navigateButton}
             onPress={handleStartNavigation}
           >
-            <Text style={styles.actionButtonText}>Start Navigation</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: "red" }]}
-            onPress={handleClearPin}
-          >
-            <Text style={styles.actionButtonText}>Clear Pin & Info</Text>
+            <Text style={styles.navigateButtonText}>Start Navigation</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {placeInfo && <PlaceInfoBox {...placeInfo} />}
+      {selectedCharger && (
+        <View style={styles.popupContainer}>
+          <PlaceInfoBox
+            name={selectedCharger.name}
+            photoUrl={selectedCharger.photoUrl || null}
+            distance={selectedCharger.distance}
+          />
+          <Text>
+            Availability: {selectedCharger.open_now ? "Open" : "Closed"}
+          </Text>
+          <Text>Charger Type: {selectedCharger.type}</Text>
+          <Text>Speed: {selectedCharger.speed ?? "Standard Speed"}</Text>
+          <TouchableOpacity
+            style={styles.navigateButton}
+            onPress={() =>
+              navigation.navigate("NavigationScreen", {
+                coordinates: [
+                  { latitude: userLocation![1], longitude: userLocation![0] },
+                  {
+                    latitude: selectedCharger.lat,
+                    longitude: selectedCharger.lng,
+                  },
+                ],
+              })
+            }
+          >
+            <Text style={styles.navigateButtonText}>Navigate</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.navigateButton,
+              { backgroundColor: "red", marginTop: 10 },
+            ]}
+            onPress={() => setSelectedCharger(null)}
+          >
+            <Text style={styles.navigateButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <TouchableOpacity style={styles.resetButton} onPress={getUserLocation}>
+        <Text style={styles.resetButtonText}>📍</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
-
-//test commit
