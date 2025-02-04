@@ -40,6 +40,14 @@ export default function MapScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const popupAnimation = useRef(new Animated.Value(0)).current;
 
+  const [expandedCluster, setExpandedCluster] = useState<string | null>(null);
+  const [expandedChargers, setExpandedChargers] = useState<any[]>([]);
+
+  const resetClusters = () => {
+    setExpandedCluster(null);
+    setExpandedChargers([]);
+  };
+
   useEffect(() => {
     getUserLocation();
   }, []);
@@ -169,7 +177,10 @@ export default function MapScreen() {
       <MapboxGL.MapView
         ref={mapRef}
         style={styles.map}
-        onPress={dismissPopup}
+        onPress={() => {
+          dismissPopup();
+          resetClusters();
+        }}
         onRegionDidChange={handleMapChange}
       >
         <MapboxGL.Camera
@@ -190,6 +201,7 @@ export default function MapScreen() {
           currentZoom={currentZoom}
           onChargerSelect={setSelectedCharger}
           cameraRef={cameraRef}
+          resetClusters={resetClusters}
         />
       </MapboxGL.MapView>
 

@@ -11,6 +11,7 @@ interface EVChargerDetailsProps {
   currentZoom: number;
   onChargerSelect: (charger: any) => void;
   cameraRef: React.RefObject<MapboxGL.Camera>;
+  resetClusters: () => void;
 }
 
 const EVChargerDetails = ({
@@ -49,11 +50,20 @@ const EVChargerDetails = ({
 
       setEvChargers(clusteredChargers);
 
-      if (Math.abs(previousZoom.current - currentZoom) > 1) {
+      if (currentZoom > 8) {
         setExpandedCluster(null);
         setExpandedChargers([]);
       }
+
+      if (currentZoom < 14) {
+        setExpandedChargers(chargers);
+      }
+
       previousZoom.current = currentZoom;
+
+      if (currentZoom < 14) {
+        setExpandedChargers(chargers);
+      }
     } catch (error) {
       console.error("Error fetching chargers:", error);
     }
@@ -79,10 +89,8 @@ const EVChargerDetails = ({
       1200
     );
 
-    setTimeout(() => {
-      setExpandedCluster(clusterId);
-      setExpandedChargers(chargers);
-    }, 1300);
+    setExpandedCluster(clusterId);
+    setExpandedChargers(chargers);
   };
 
   return (
