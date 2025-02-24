@@ -71,6 +71,7 @@ export default {
       mapboxAccessToken: process.env.MAPBOX_ACCESS_TOKEN,
       mapboxDownloadToken: process.env.MAPBOX_DOWNLOADS_TOKEN,
       googlePlacesApiKey: process.env.GOOGLE_API_KEY,
+      chargerApiKey: process.env.CHARGER_API_KEY,
       eas: {
         projectId: "5fa79631-a402-4186-b1e8-aa5b62ec5928",
       },

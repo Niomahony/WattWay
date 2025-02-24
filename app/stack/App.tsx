@@ -12,7 +12,11 @@ export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="MapScreen">
-        <Stack.Screen name="MapScreen" component={MapScreen} />
+        <Stack.Screen
+          name="MapScreen"
+          component={MapScreen}
+          options={{ headerShown: false }}
+        />
         <Stack.Screen name="NavigationScreen" component={NavigationScreen} />
       </Stack.Navigator>
     </NavigationContainer>

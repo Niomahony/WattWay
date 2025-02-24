@@ -6,30 +6,25 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     fontSize: 32,
   },
-
   emojiText: {
     fontSize: 32,
     textAlign: "center",
   },
-
   container: {
     flex: 1,
   },
-
   map: {
     flex: 1,
   },
-
   largePinContainer: {
     justifyContent: "center",
     alignItems: "center",
     fontSize: 32,
     backgroundColor: "transparent",
   },
-
   searchBar: {
     position: "absolute",
-    top: 10,
+    top: 100,
     left: 10,
     right: 10,
     padding: 10,
@@ -37,7 +32,6 @@ export const styles = StyleSheet.create({
     borderRadius: 10,
     zIndex: 2,
   },
-
   suggestionsList: {
     position: "absolute",
     top: 60,
@@ -46,38 +40,32 @@ export const styles = StyleSheet.create({
     backgroundColor: "white",
     zIndex: 2,
   },
-
   suggestionItem: {
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#ccc",
   },
-
   infoBox: {
     padding: 10,
     borderTopWidth: 1,
     borderColor: "#ccc",
     backgroundColor: "white",
   },
-
   placeImage: {
     width: 100,
     height: 100,
     borderRadius: 10,
     marginBottom: 10,
   },
-
   defaultPin: {
     justifyContent: "center",
     alignItems: "center",
     fontSize: 24,
   },
-
   pinText: {
     fontSize: 24,
     textAlign: "center",
   },
-
   actionButton: {
     backgroundColor: "#1E90FF",
     padding: 10,
@@ -87,12 +75,10 @@ export const styles = StyleSheet.create({
     position: "relative",
     zIndex: 1,
   },
-
   actionButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
   },
-
   evMarker: {
     backgroundColor: "green",
     padding: 15,
@@ -102,13 +88,11 @@ export const styles = StyleSheet.create({
     width: 60,
     height: 60,
   },
-
   evMarkerText: {
     fontSize: 24,
     color: "white",
     fontWeight: "bold",
   },
-
   chargerList: {
     position: "absolute",
     bottom: 100,
@@ -125,19 +109,16 @@ export const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-
   chargerItem: {
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#ddd",
     alignItems: "center",
   },
-
   chargerText: {
     fontSize: 16,
     fontWeight: "bold",
   },
-
   popupContainer: {
     position: "absolute",
     bottom: 50,
@@ -153,7 +134,6 @@ export const styles = StyleSheet.create({
     shadowRadius: 4,
     alignItems: "center",
   },
-
   navigateButton: {
     backgroundColor: "blue",
     padding: 12,
@@ -161,13 +141,11 @@ export const styles = StyleSheet.create({
     borderRadius: 5,
     alignItems: "center",
   },
-
   navigateButtonText: {
     color: "white",
     fontWeight: "bold",
     fontSize: 16,
   },
-
   buttonContainer: {
     position: "absolute",
     bottom: 300,
@@ -175,7 +153,6 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-
   resetButton: {
     backgroundColor: "white",
     padding: 10,
@@ -225,5 +202,71 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#FFF",
+  },
+  filterContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-around",
+    alignItems: "center",
+    padding: 10,
+    backgroundColor: "white",
+    elevation: 3,
+    zIndex: 1000,
+  },
+  dropdown: {
+    top: 80,
+    marginVertical: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 5,
+  },
+  // Hamburger button in top left
+  hamburgerButton: {
+    position: "absolute",
+    top: 30,
+    left: 20,
+    zIndex: 1100,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    padding: 10,
+    borderRadius: 5,
+  },
+  hamburgerText: {
+    fontSize: 24,
+    color: "#000",
+  },
+  // Animated filter menu container (overlay)
+  filterMenuContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: 250,
+    height: "100%",
+    backgroundColor: "rgba(255,255,255,0.9)",
+    zIndex: 1050,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  filterMenuCloseButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    padding: 10,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    zIndex: 1,
+  },
+  filterMenuCloseText: {
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+  filterMenuTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
   },
 });

@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 
 const googlePlacesApiKey = Constants.expoConfig?.extra?.googlePlacesApiKey;
+const chargerApiKey = Constants.expoConfig?.extra?.chargerApiKey;
 
 export async function fetchPlaceDetails(placeId: string) {
   try {
@@ -129,62 +130,92 @@ export const fetchEVChargersAlongRoute = async (
 
   return results;
 };
+type Charger = {
+  type: string;
+  total: number;
+  availability: {
+    current: {
+      available: number;
+      occupied: number;
+    };
+  };
+  powerLevels: {
+    powerKW: number;
+    available: number;
+  }[];
+};
 
-export const fetchEVChargers = async (coords: [number, number]) => {
-  const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${coords[1]},${coords[0]}&radius=5000&type=charging_station&key=${googlePlacesApiKey}`;
+if (!chargerApiKey) {
+  console.error("❌ ERROR: TomTom API Key is missing! Check your Expo config.");
+}
 
+export async function fetchEVChargers(
+  coords: [number, number],
+  filters: {
+    connectorSet?: string | null;
+    minPowerKW?: number | null;
+  }
+) {
   try {
-    const response = await fetch(url);
-    const jsonData = await response.json();
-
-    if (!jsonData.results) {
+    if (!chargerApiKey) {
+      console.error("🚨 TomTom API Key is missing! Check Expo config.");
       return [];
     }
 
-    interface Charger {
-      name: string;
-      lat: number;
-      lng: number;
-      place_id: string;
-      open_now: boolean | "Unknown";
-      rating: number | "No rating";
-      total_ratings: number;
-      type: "Fast Charger" | "Standard Charger";
+    const query = "ev charger";
+    let url = `https://api.tomtom.com/search/2/poiSearch/${encodeURIComponent(
+      query
+    )}.json?key=${chargerApiKey}&lat=${coords[1]}&lon=${
+      coords[0]
+    }&radius=5000&categorySet=7309`;
+
+    if (filters.connectorSet) {
+      url += `&connectorSet=${filters.connectorSet}`;
+    }
+    if (filters.minPowerKW) {
+      url += `&minPowerKW=${filters.minPowerKW}`;
     }
 
-    interface ChargerResponse {
-      name: string;
-      geometry: {
-        location: {
-          lat: number;
-          lng: number;
-        };
-      };
-      place_id: string;
-      opening_hours?: {
-        open_now: boolean;
-      };
-      rating?: number;
-      user_ratings_total?: number;
-      types: string[];
+    console.log("🚗 Fetching EV chargers from TomTom POI Search...");
+    console.log("🔗 Request URL:", url);
+
+    const response = await fetch(url);
+    console.log(" response:", response);
+
+    if (!response.ok) {
+      console.error(
+        `❌ TomTom API error: ${response.status} ${response.statusText}`
+      );
+      return [];
     }
 
-    return jsonData.results.map(
-      (charger: ChargerResponse): Charger => ({
-        name: charger.name,
-        lat: charger.geometry.location.lat,
-        lng: charger.geometry.location.lng,
-        place_id: charger.place_id,
-        open_now: charger.opening_hours?.open_now ?? "Unknown",
-        rating: charger.rating ?? "No rating",
-        total_ratings: charger.user_ratings_total ?? 0,
-        type: charger.types.includes("fast_charging")
-          ? "Fast Charger"
-          : "Standard Charger",
-      })
-    );
+    const jsonData = await response.json();
+
+    if (!jsonData.results || jsonData.results.length === 0) {
+      console.warn("⚠️ No EV chargers found.");
+      return [];
+    }
+
+    return jsonData.results.map((charger: any) => ({
+      name: charger.poi.name,
+      lat: charger.position.lat,
+      lng: charger.position.lon,
+      address: charger.address.freeformAddress,
+      type: charger.poi.categories.includes("EV Charging Station")
+        ? "EV Charger"
+        : "Other",
+      powerLevels:
+        charger.chargingAvailability?.connectors?.map((conn: any) => ({
+          type: conn.type,
+          powerKW: conn.powerKW,
+          available: conn.availability?.current?.available ?? 0,
+        })) ?? [],
+    }));
   } catch (error) {
-    console.error("Error fetching EV chargers:", error);
+    console.error(
+      "❌ Error fetching EV chargers from TomTom POI Search:",
+      error
+    );
     return [];
   }
-};
+}
