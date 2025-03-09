@@ -1,25 +1,23 @@
 import Constants from "expo-constants";
 
-const googlePlacesApiKey = Constants.expoConfig?.extra?.googlePlacesApiKey;
 const chargerApiKey = Constants.expoConfig?.extra?.chargerApiKey;
+const googleMapsApiKey = Constants.expoConfig?.extra?.googlePlacesApiKey;
+const mapboxAccessToken = Constants.expoConfig?.extra?.mapboxDownloadToken;
 
 export async function fetchPlaceDetails(placeId: string) {
   try {
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/details/json?placeid=${placeId}&key=${googlePlacesApiKey}`
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${placeId}.json?access_token=${mapboxAccessToken}`
     );
     const data = await response.json();
-    if (data.result) {
-      const photoUrl = data.result.photos
-        ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${data.result.photos[0].photo_reference}&key=${googlePlacesApiKey}`
-        : null;
+
+    if (data.features.length > 0) {
+      const place = data.features[0];
+
       return {
-        name: data.result.name,
-        coordinates: [
-          data.result.geometry.location.lng,
-          data.result.geometry.location.lat,
-        ],
-        photoUrl,
+        name: place.text,
+        coordinates: place.center as [number, number],
+        photoUrl: null, // Mapbox doesn't provide photos like Google Places
       };
     }
     return null;
@@ -32,14 +30,15 @@ export async function fetchPlaceDetails(placeId: string) {
 export async function fetchSuggestions(searchQuery: string) {
   try {
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
         searchQuery
-      )}&key=${googlePlacesApiKey}`
+      )}.json?autocomplete=true&access_token=${mapboxAccessToken}`
     );
     const data = await response.json();
-    return data.predictions.map((prediction: any) => ({
-      id: prediction.place_id,
-      place_name: prediction.description,
+
+    return data.features.map((feature: any) => ({
+      id: feature.id,
+      place_name: feature.place_name,
     }));
   } catch (error) {
     console.error("Error fetching suggestions:", error);
@@ -50,12 +49,13 @@ export async function fetchSuggestions(searchQuery: string) {
 export async function fetchPlaceDetailsByCoordinates(lat: number, lng: number) {
   try {
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${googlePlacesApiKey}`
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxAccessToken}`
     );
     const data = await response.json();
-    if (data.results.length > 0) {
+
+    if (data.features.length > 0) {
       return {
-        name: data.results[0].formatted_address,
+        name: data.features[0].place_name,
         coordinates: [lng, lat] as [number, number],
         photoUrl: null,
       };
@@ -67,43 +67,35 @@ export async function fetchPlaceDetailsByCoordinates(lat: number, lng: number) {
   }
 }
 
-export async function calculateDrivingDistance(
+export async function calculateDrivingDistanceAndTime(
   origin: [number, number],
   destination: [number, number]
-): Promise<string> {
+): Promise<{ distance: string; duration: string }> {
   try {
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin[1]},${origin[0]}&destinations=${destination[1]},${destination[0]}&key=${googlePlacesApiKey}`
+      `https://api.mapbox.com/directions/v5/mapbox/driving/${origin[1]},${origin[0]};${destination[1]},${destination[0]}?access_token=${mapboxAccessToken}&geometries=geojson&overview=full`
     );
+
     const data = await response.json();
 
-    if (
-      data.rows &&
-      data.rows[0] &&
-      data.rows[0].elements &&
-      data.rows[0].elements[0] &&
-      data.rows[0].elements[0].distance &&
-      data.rows[0].elements[0].distance.text
-    ) {
-      const distanceText = data.rows[0].elements[0].distance.text;
+    if (data.routes && data.routes.length > 0) {
+      const route = data.routes[0];
+      const distance = `${(route.distance / 1000).toFixed(2)} km`; // Convert meters to km
+      const duration = `${Math.round(route.duration / 60)} min`;
 
-      const numericDistance = parseFloat(distanceText.replace(/[^0-9.]/g, ""));
-
-      if (!isNaN(numericDistance)) {
-        return `${numericDistance} ${distanceText
-          .replace(/[0-9.]/g, "")
-          .trim()}`;
-      } else {
-        console.warn("Distance data could not be parsed properly.");
-        return "Error calculating driving distance";
-      }
+      return { distance, duration };
     } else {
-      console.warn("Distance data not available in response.");
-      return "Distance not available";
+      console.warn("Distance and duration data not available in response.");
+      console.log("Mapbox API Response:", data);
+
+      return {
+        distance: "Distance not available",
+        duration: "Duration not available",
+      };
     }
   } catch (error) {
-    console.error("Error calculating driving distance:", error);
-    return "Error calculating driving distance";
+    console.error("Error calculating driving distance and time:", error);
+    return { distance: "Error", duration: "Error" };
   }
 }
 
@@ -115,7 +107,7 @@ export const fetchEVChargersAlongRoute = async (
   for (let i = 0; i < routeCoordinates.length; i += 5) {
     const { latitude, longitude } = routeCoordinates[i];
 
-    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=2000&type=charging_station&key=${googlePlacesApiKey}`;
+    const url = `https://api.tomtom.com/search/2/poiSearch/ev%20charger.json?key=${chargerApiKey}&lat=${latitude}&lon=${longitude}&radius=5000&categorySet=7309`;
 
     try {
       const response = await fetch(url);
@@ -124,30 +116,24 @@ export const fetchEVChargersAlongRoute = async (
         results.push(...data.results);
       }
     } catch (error) {
-      console.error("Error fetching EV chargers:", error);
+      console.error("Error fetching EV chargers from TomTom:", error);
     }
   }
 
-  return results;
+  return results.map((charger: any) => ({
+    name: charger.poi.name,
+    lat: charger.position.lat,
+    lng: charger.position.lon,
+    address: charger.address.freeformAddress,
+    type: "EV Charger",
+    powerLevels:
+      charger.chargingAvailability?.connectors?.map((conn: any) => ({
+        type: conn.type,
+        powerKW: conn.powerKW,
+        available: conn.availability?.current?.available ?? 0,
+      })) ?? [],
+  }));
 };
-type Charger = {
-  type: string;
-  total: number;
-  availability: {
-    current: {
-      available: number;
-      occupied: number;
-    };
-  };
-  powerLevels: {
-    powerKW: number;
-    available: number;
-  }[];
-};
-
-if (!chargerApiKey) {
-  console.error("❌ ERROR: TomTom API Key is missing! Check your Expo config.");
-}
 
 export async function fetchEVChargers(
   coords: [number, number],

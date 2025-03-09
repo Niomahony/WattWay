@@ -24,10 +24,9 @@ export const styles = StyleSheet.create({
   },
   searchBar: {
     position: "absolute",
-    top: 100,
-    left: 10,
-    right: 10,
-    padding: 10,
+    top: "5%",
+    width: "90%",
+    alignSelf: "center",
     backgroundColor: "white",
     borderRadius: 10,
     zIndex: 2,
@@ -224,10 +223,10 @@ export const styles = StyleSheet.create({
   // Hamburger button in top left
   hamburgerButton: {
     position: "absolute",
-    top: 30,
+    top: "5%",
     left: 20,
     zIndex: 1100,
-    backgroundColor: "rgba(255,255,255,0.8)",
+    backgroundColor: "white",
     padding: 10,
     borderRadius: 5,
   },
@@ -268,5 +267,12 @@ export const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 10,
+  },
+  carDistanceInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: "95%",
   },
 });

@@ -17,7 +17,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { useNavigation } from "@react-navigation/native";
 import { RootStackParamList } from "../navigation/NavigationTypes";
 import EVChargerDetails from "../components/EVChargerDetails";
-import { Dropdown } from "react-native-element-dropdown";
+import CarSettings from "../components/CarSettings";
 
 const mapboxAccessToken = Constants.expoConfig?.extra?.mapboxAccessToken;
 MapboxGL.setAccessToken(mapboxAccessToken);
@@ -44,16 +44,22 @@ export default function MapScreen() {
   const [filterMenuVisible, setFilterMenuVisible] = useState(false);
   const filterMenuAnim = useRef(new Animated.Value(-250)).current;
 
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<{
+    chargerType: string | null;
+    chargingSpeed: string | null;
+    minRating: number | null;
+    brand: string | null;
+  }>({
     chargerType: null,
     chargingSpeed: null,
     minRating: null,
     brand: null,
   });
-
+  const [carRange, setCarRange] = useState<number>(0);
   useEffect(() => {
     getUserLocation();
   }, []);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     if (selectedCharger || searchedLocation) {
@@ -134,6 +140,7 @@ export default function MapScreen() {
       Alert.alert("Error", "Please select a destination first.");
       return;
     }
+
     navigation.navigate("NavigationScreen", {
       coordinates: [
         { latitude: userLocation[1], longitude: userLocation[0] },
@@ -142,6 +149,7 @@ export default function MapScreen() {
           longitude: searchedLocation?.coordinates[0] || selectedCharger?.lng,
         },
       ],
+      carRange, // Pass car range
     });
   };
 
@@ -181,14 +189,6 @@ export default function MapScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {}
-      <TouchableOpacity
-        style={styles.hamburgerButton}
-        onPress={() => setFilterMenuVisible(!filterMenuVisible)}
-      >
-        <Text style={styles.hamburgerText}>☰</Text>
-      </TouchableOpacity>
-
-      {}
       <Animated.View
         pointerEvents={filterMenuVisible ? "auto" : "none"}
         style={[
@@ -197,71 +197,20 @@ export default function MapScreen() {
             transform: [{ translateX: filterMenuAnim }],
           },
         ]}
-      >
-        <Dropdown
-          data={[
-            { label: "Fast Charger", value: "Fast Charger" },
-            { label: "Standard Charger", value: "Standard Charger" },
-          ]}
-          placeholder="Select Charger Type"
-          value={filters.chargerType}
-          labelField="label"
-          valueField="value"
-          onChange={(item) =>
-            setFilters({ ...filters, chargerType: item.value })
-          }
-          style={styles.dropdown}
-        />
-        <Dropdown
-          data={[
-            { label: "Slow (2.3 - 6 kW)", value: "slow" },
-            { label: "Fast (7 - 22 kW)", value: "fast" },
-            { label: "Rapid (50 - 100 kW)", value: "rapid" },
-            { label: "Ultra-Rapid (100+ kW)", value: "ultra-rapid" },
-          ]}
-          placeholder="Charging Speed"
-          labelField="label"
-          valueField="value"
-          value={filters.chargingSpeed}
-          onChange={(item) =>
-            setFilters({ ...filters, chargingSpeed: item.value })
-          }
-          style={styles.dropdown}
-        />
-        <Dropdown
-          data={[
-            { label: "1+", value: 1 },
-            { label: "2+", value: 2 },
-            { label: "3+", value: 3 },
-            { label: "4+", value: 4 },
-          ]}
-          placeholder="Min Rating"
-          labelField="label"
-          valueField="value"
-          value={filters.minRating}
-          onChange={(item) => setFilters({ ...filters, minRating: item.value })}
-          style={styles.dropdown}
-        />
-        <Dropdown
-          data={[
-            { label: "Tesla", value: "Tesla" },
-            { label: "ChargePoint", value: "ChargePoint" },
-            { label: "EVgo", value: "EVgo" },
-          ]}
-          placeholder="Brand"
-          labelField="label"
-          valueField="value"
-          value={filters.brand}
-          onChange={(item) => setFilters({ ...filters, brand: item.value })}
-          style={styles.dropdown}
-        />
-      </Animated.View>
-
+      ></Animated.View>
       <SearchBar onSuggestionSelect={handleSelectSearchLocation} />
+      <CarSettings
+        visible={modalVisible}
+        onDismiss={() => setModalVisible(false)}
+        onRangeChange={setCarRange}
+        filters={filters} // Pass filters state
+        setFilters={setFilters} // Pass setFilters function
+      />
 
       <MapboxGL.MapView
         ref={mapRef}
         style={styles.map}
+        styleURL="mapbox://styles/mapbox/outdoors-v11"
         onPress={() => {
           dismissPopup();
         }}
@@ -291,7 +240,6 @@ export default function MapScreen() {
           }}
         />
       </MapboxGL.MapView>
-
       <Animated.View
         style={[
           styles.popupContainer,
@@ -311,14 +259,16 @@ export default function MapScreen() {
           <PlaceInfoBox
             name={searchedLocation.name}
             photoUrl={null}
-            distance={"Unknown distance"}
+            origin={userLocation as [number, number]}
+            destination={searchedLocation.coordinates}
           />
         )}
         {selectedCharger && (
           <PlaceInfoBox
             name={selectedCharger.name}
             photoUrl={selectedCharger.photoUrl || null}
-            distance={selectedCharger.distance}
+            origin={userLocation as [number, number]}
+            destination={[selectedCharger.lat, selectedCharger.lng]}
           />
         )}
         {(selectedCharger || searchedLocation) && (
@@ -330,7 +280,6 @@ export default function MapScreen() {
           </TouchableOpacity>
         )}
       </Animated.View>
-
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={styles.resetButton}
@@ -343,6 +292,12 @@ export default function MapScreen() {
           onPress={resetCameraToNorth}
         >
           <Text style={styles.resetButtonText}>🧭</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.resetButton}
+          onPress={() => setModalVisible(true)}
+        >
+          <Text style={styles.resetButtonText}>⚡</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

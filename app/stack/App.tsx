@@ -5,20 +5,23 @@ import { createStackNavigator } from "@react-navigation/stack";
 import MapScreen from "../components/MapScreen";
 import NavigationScreen from "../components/NavigationScreen";
 import { RootStackParamList } from "../navigation/NavigationTypes";
+import { PaperProvider } from "react-native-paper";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="MapScreen">
-        <Stack.Screen
-          name="MapScreen"
-          component={MapScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen name="NavigationScreen" component={NavigationScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <PaperProvider>
+      <NavigationContainer>
+        <Stack.Navigator initialRouteName="MapScreen">
+          <Stack.Screen
+            name="MapScreen"
+            component={MapScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="NavigationScreen" component={NavigationScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </PaperProvider>
   );
 }

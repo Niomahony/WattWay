@@ -1,12 +1,7 @@
 import React, { useState } from "react";
-import {
-  View,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  Text,
-} from "react-native";
-import { fetchPlaceDetails, fetchSuggestions } from "../api/googlePlaces";
+import { View, FlatList, TouchableOpacity, Text } from "react-native";
+import { Searchbar } from "react-native-paper";
+import { fetchPlaceDetails, fetchSuggestions } from "../api/mapApi";
 import { styles } from "../styles/styles";
 
 interface SearchBarProps {
@@ -46,10 +41,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSuggestionSelect }) => {
 
   return (
     <View style={styles.searchBar}>
-      <TextInput
+      <Searchbar
         placeholder="Search for a location..."
         value={searchQuery}
         onChangeText={handleSearch}
+        style={{ backgroundColor: "white" }}
       />
       {suggestions.length > 0 && (
         <FlatList

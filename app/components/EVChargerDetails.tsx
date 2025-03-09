@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import MapboxGL from "@rnmapbox/maps";
 import { styles } from "../styles/styles";
-import { fetchEVChargers } from "../api/googlePlaces";
+import { fetchEVChargers } from "../api/mapApi";
 import { clusterChargers } from "../helpers/ClusterChargers";
 
 interface EVChargerDetailsProps {
