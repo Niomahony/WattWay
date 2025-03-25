@@ -4,23 +4,26 @@ export default {
     slug: "WattWay",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    icon: "./app/assets/icon.png",
     userInterfaceStyle: "light",
     newArchEnabled: true,
     splash: {
-      image: "./assets/splash-icon.png",
+      image: "./app/assets/splash-icon.png",
       resizeMode: "contain",
       backgroundColor: "#ffffff",
     },
     ios: {
+      bundleIdentifier: "com.nickomahony.WattWay",
+      useFrameworks: "static",
       supportsTablet: true,
       infoPlist: {
         MBXAccessToken: process.env.MAPBOX_ACCESS_TOKEN,
       },
     },
+
     android: {
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
+        foregroundImage: "./app/assets/icon.png",
         backgroundColor: "#ffffff",
       },
       permissions: [
@@ -30,14 +33,14 @@ export default {
       package: "com.nickomahony.WattWay",
     },
     web: {
-      favicon: "./assets/favicon.png",
+      favicon: "./app/assets/favicon.png",
     },
     plugins: [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          image: "./assets/splash-icon.png",
+          image: "./app/assets/splash-icon.png",
           imageWidth: 200,
           resizeMode: "contain",
           backgroundColor: "#ffffff",

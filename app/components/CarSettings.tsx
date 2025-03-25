@@ -1,48 +1,58 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { View, StyleSheet } from "react-native";
 import { Modal, Portal, Text, Button, TextInput } from "react-native-paper";
 import { Slider } from "@rneui/themed";
-import { Dropdown } from "react-native-element-dropdown";
 import debounce from "lodash/debounce"; // Import debounce
 
-interface CarSettingsModalProps {
+interface RangeModalProps {
   visible: boolean;
   onDismiss: () => void;
-  onRangeChange: (range: number) => void;
-  filters: {
-    chargerType: string | null;
-    chargingSpeed: string | null;
-    minRating: number | null;
-    brand: string | null;
-  };
-  setFilters: (filters: {
-    chargerType: string | null;
-    chargingSpeed: string | null;
-    minRating: number | null;
-    brand: string | null;
-  }) => void;
+  setRange: (range: { availableRange: number; maxRange: number }) => void;
+  initialAvailableRange?: number;
+  initialMaxRange?: number;
 }
 
-const CarSettingsModal: React.FC<CarSettingsModalProps> = ({
+const RangeModal: React.FC<RangeModalProps> = ({
   visible,
   onDismiss,
-  onRangeChange,
-  filters,
-  setFilters,
+  setRange,
+  initialAvailableRange = 100,
+  initialMaxRange = 500,
 }) => {
-  const [km, setKm] = useState("");
+  const [availableRange, setAvailableRange] = useState(
+    initialAvailableRange.toString()
+  );
+  const [maxRange, setMaxRange] = useState(initialMaxRange.toString());
 
-  // Debounced function to limit API calls
-  const debouncedOnRangeChange = useCallback(
-    debounce((value) => {
-      onRangeChange(value);
-    }, 500), // Adjust delay (500ms = half a second)
+  // Debounced function to limit updates
+  const debouncedSetRange = useCallback(
+    debounce((available, max) => {
+      setRange({ availableRange: available, maxRange: max });
+    }, 500),
     []
   );
 
-  const handleSliderChange = (value: number) => {
-    setKm(value.toString());
-    debouncedOnRangeChange(value); // Use debounced function
+  const handleAvailableRangeChange = (value: number) => {
+    setAvailableRange(value.toString());
+    debouncedSetRange(value, parseInt(maxRange) || 0);
+  };
+
+  const handleMaxRangeChange = (value: number) => {
+    setMaxRange(value.toString());
+    debouncedSetRange(parseInt(availableRange) || 0, value);
+  };
+
+  const handleSave = () => {
+    const available = parseInt(availableRange) || 0;
+    const max = parseInt(maxRange) || 0;
+
+    if (available > max) {
+      alert("Available range cannot be greater than the maximum range!");
+      return;
+    }
+
+    setRange({ availableRange: available, maxRange: max });
+    onDismiss();
   };
 
   return (
@@ -52,96 +62,55 @@ const CarSettingsModal: React.FC<CarSettingsModalProps> = ({
         onDismiss={onDismiss}
         contentContainerStyle={styles.modalContainer}
       >
-        <Text style={styles.modalTitle}>Set your available range</Text>
+        <Text style={styles.modalTitle}>Set Your Range</Text>
 
-        {/* Range Input */}
-        <TextInput
-          style={styles.input}
-          value={km}
-          onChangeText={(text) => setKm(text.replace(/[^0-9]/g, ""))}
-          keyboardType="numeric"
-          mode="outlined"
-          right={<TextInput.Affix text=" km" />}
-        />
-        <Slider
-          value={parseFloat(km) || 0}
-          onValueChange={handleSliderChange}
-          minimumValue={0}
-          maximumValue={1000}
-          step={10}
-          trackStyle={styles.track}
-          thumbStyle={styles.thumb}
-          minimumTrackTintColor="#6200EE"
-          maximumTrackTintColor="#C0C0C0"
-        />
+        <View style={styles.sliderContainer}>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Current Available Range</Text>
+            <Text style={styles.valueDisplay}>{availableRange} km</Text>
+          </View>
+          <Slider
+            value={parseFloat(availableRange) || 0}
+            onValueChange={handleAvailableRangeChange}
+            minimumValue={0}
+            maximumValue={1000}
+            step={10}
+            trackStyle={styles.track}
+            thumbStyle={styles.thumb}
+            minimumTrackTintColor="#007AFF"
+            maximumTrackTintColor="#E5E5EA"
+            allowTouchTrack
+            thumbTintColor="#007AFF"
+          />
+        </View>
 
-        {/* Charger Type Dropdown */}
-        <Dropdown
-          data={[
-            { label: "Fast Charger", value: "Fast Charger" },
-            { label: "Standard Charger", value: "Standard Charger" },
-          ]}
-          placeholder="Select Charger Type"
-          value={filters.chargerType}
-          labelField="label"
-          valueField="value"
-          onChange={(item) =>
-            setFilters({ ...filters, chargerType: item.value })
-          }
-          style={styles.dropdown}
-        />
+        <View style={styles.sliderContainer}>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Maximum Range</Text>
+            <Text style={styles.valueDisplay}>{maxRange} km</Text>
+          </View>
+          <Slider
+            value={parseFloat(maxRange) || 0}
+            onValueChange={handleMaxRangeChange}
+            minimumValue={0}
+            maximumValue={1000}
+            step={10}
+            trackStyle={styles.track}
+            thumbStyle={styles.thumb}
+            minimumTrackTintColor="#007AFF"
+            maximumTrackTintColor="#E5E5EA"
+            allowTouchTrack
+            thumbTintColor="#007AFF"
+          />
+        </View>
 
-        {/* Charging Speed Dropdown */}
-        <Dropdown
-          data={[
-            { label: "Slow (2.3 - 6 kW)", value: "slow" },
-            { label: "Fast (7 - 22 kW)", value: "fast" },
-            { label: "Rapid (50 - 100 kW)", value: "rapid" },
-            { label: "Ultra-Rapid (100+ kW)", value: "ultra-rapid" },
-          ]}
-          placeholder="Charging Speed"
-          value={filters.chargingSpeed}
-          labelField="label"
-          valueField="value"
-          onChange={(item) =>
-            setFilters({ ...filters, chargingSpeed: item.value })
-          }
-          style={styles.dropdown}
-        />
-
-        {/* Minimum Rating Dropdown */}
-        <Dropdown
-          data={[
-            { label: "1+", value: 1 },
-            { label: "2+", value: 2 },
-            { label: "3+", value: 3 },
-            { label: "4+", value: 4 },
-          ]}
-          placeholder="Min Rating"
-          value={filters.minRating}
-          labelField="label"
-          valueField="value"
-          onChange={(item) => setFilters({ ...filters, minRating: item.value })}
-          style={styles.dropdown}
-        />
-
-        {/* Brand Dropdown */}
-        <Dropdown
-          data={[
-            { label: "Tesla", value: "Tesla" },
-            { label: "ChargePoint", value: "ChargePoint" },
-            { label: "EVgo", value: "EVgo" },
-          ]}
-          placeholder="Brand"
-          value={filters.brand}
-          labelField="label"
-          valueField="value"
-          onChange={(item) => setFilters({ ...filters, brand: item.value })}
-          style={styles.dropdown}
-        />
-
-        <Button mode="contained" onPress={onDismiss} style={styles.closeButton}>
-          Close
+        <Button
+          mode="contained"
+          onPress={handleSave}
+          style={styles.saveButton}
+          labelStyle={styles.saveButtonLabel}
+        >
+          Save & Close
         </Button>
       </Modal>
     </Portal>
@@ -153,40 +122,71 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     padding: 20,
     marginHorizontal: 20,
-    borderRadius: 10,
-    elevation: 5,
+    borderRadius: 20,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-    color: "rgb(66, 245, 105)",
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 28,
+    color: "#1a1a1a",
+    textAlign: "center",
   },
-  input: {
-    backgroundColor: "transparent",
-    marginBottom: 10,
-    color: "black",
+  sliderContainer: {
+    marginBottom: 28,
+    paddingHorizontal: 4,
   },
-  dropdown: {
-    marginBottom: 10,
-    backgroundColor: "white",
-    borderRadius: 5,
-    padding: 10,
+  labelContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  label: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#666",
+  },
+  valueDisplay: {
+    fontSize: 24,
+    fontWeight: "600",
+    color: "#007AFF",
   },
   track: {
-    height: 5,
-    borderRadius: 5,
-    color: "rgb(227, 225, 254)",
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#E5E5EA",
   },
   thumb: {
-    height: 20,
-    width: 20,
-    backgroundColor: "#6200EE",
+    height: 24,
+    width: 24,
+    backgroundColor: "#007AFF",
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  closeButton: {
-    marginTop: 10,
-    backgroundColor: "rgb(227, 225, 254)",
+  saveButton: {
+    marginTop: 20,
+    backgroundColor: "#007AFF",
+    paddingVertical: 10,
+    borderRadius: 10,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  saveButtonLabel: {
+    fontSize: 15,
+    fontWeight: "600",
   },
 });
 
-export default CarSettingsModal;
+export default RangeModal;

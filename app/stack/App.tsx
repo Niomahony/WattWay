@@ -13,12 +13,13 @@ export default function App() {
   return (
     <PaperProvider>
       <NavigationContainer>
-        <Stack.Navigator initialRouteName="MapScreen">
-          <Stack.Screen
-            name="MapScreen"
-            component={MapScreen}
-            options={{ headerShown: false }}
-          />
+        <Stack.Navigator
+          initialRouteName="MapScreen"
+          screenOptions={{
+            headerShown: false,
+          }}
+        >
+          <Stack.Screen name="MapScreen" component={MapScreen} />
           <Stack.Screen name="NavigationScreen" component={NavigationScreen} />
         </Stack.Navigator>
       </NavigationContainer>

@@ -10,57 +10,50 @@ import {
   Easing,
 } from "react-native";
 import * as Location from "expo-location";
-import { SearchBar } from "./common/SearchBar";
-import { PlaceInfoBox } from "./common/PlaceInfoBox";
-import { styles } from "../styles/styles";
+import {
+  SearchBar,
+  PlaceInfoBox,
+  SettingsModal,
+  AmenityFilter,
+  InfoModal,
+} from "../common";
+import { styles } from "../../styles/styles";
 import MapboxGL from "@rnmapbox/maps";
 import Constants from "expo-constants";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { useNavigation } from "@react-navigation/native";
-import { RootStackParamList } from "../navigation/NavigationTypes";
-import EVChargerDetails from "./map/EVChargerDetails";
-import SettingsModal from "./common/SettingsModal";
-import AmenityFilter from "./common/AmenityFilter";
-import InfoModal from "./common/InfoModal";
+import { RootStackParamList } from "../../navigation/NavigationTypes";
+import { MapControls, LocationPopup, EVChargerDetails } from "./";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { useLocation } from "../hooks/map/useLocation";
-import { useFilters } from "../hooks/filters/useFilters";
-import { MapControls } from "./map/MapControls";
-import { LocationPopup } from "./map/LocationPopup";
+import { useLocation, useMapState } from "../../hooks/map";
+import { useFilters } from "../../hooks/filters";
 
 const mapboxAccessToken = Constants.expoConfig?.extra?.mapboxAccessToken;
 MapboxGL.setAccessToken(mapboxAccessToken);
 
-// Create a memoized version of AmenityFilter to prevent re-renders
 const MemoizedAmenityFilter = React.memo(AmenityFilter);
 
-// Create a memoized version of PlaceInfoBox to prevent re-renders
 const MemoizedPlaceInfoBox = React.memo(PlaceInfoBox);
 
-// Create a memoized version of SettingsModal to prevent re-renders
 const MemoizedSettingsModal = React.memo(SettingsModal);
 
-// Define the main component function
 function MapScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
-  // Custom hooks
   const { centerCoordinate, userLocation, getUserLocation } = useLocation();
   const { filters, setFilters, toggleAmenity, clearAllAmenities } =
     useFilters();
 
-  // State
   const [selectedCharger, setSelectedCharger] = useState<any | null>(null);
   const [searchedLocation, setSearchedLocation] = useState<{
     name: string;
     coordinates: [number, number];
   } | null>(null);
   const [currentZoom, setCurrentZoom] = useState(12);
-  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [filterMenuVisible, setFilterMenuVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [infoModalVisible, setInfoModalVisible] = useState(false);
@@ -68,8 +61,10 @@ function MapScreen() {
     availableRange: 100,
     maxRange: 500,
   });
+  const [mapCenterCoordinate, setMapCenterCoordinate] = useState<
+    [number, number] | null
+  >(null);
 
-  // Refs
   const mapRef = useRef<MapboxGL.MapView>(null);
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const popupAnimation = useRef(new Animated.Value(0)).current;
@@ -77,7 +72,6 @@ function MapScreen() {
   const prevCenter = useRef<[number, number] | null>(null);
   const prevZoom = useRef<number | null>(null);
 
-  // Effects
   useEffect(() => {
     if (selectedCharger || searchedLocation) {
       Animated.timing(popupAnimation, {
@@ -104,13 +98,6 @@ function MapScreen() {
     }).start();
   }, [filterMenuVisible]);
 
-  useEffect(() => {
-    if (centerCoordinate && !mapCenter) {
-      setMapCenter(centerCoordinate);
-    }
-  }, [centerCoordinate, mapCenter]);
-
-  // Handlers
   const handleSelectSearchLocation = (location: {
     name: string;
     coordinates: [number, number];
@@ -189,19 +176,18 @@ function MapScreen() {
         return;
       }
 
+      setMapCenterCoordinate(mapCenter);
       prevCenter.current = mapCenter;
       prevZoom.current = newZoom;
       setCurrentZoom(newZoom);
-      setMapCenter(mapCenter);
     } catch (error) {
       console.error("Error getting map zoom or center:", error);
     }
   };
 
-  // Memoize the EVChargerDetails props
   const evChargerDetailsProps = useMemo(
     () => ({
-      centerCoordinate: mapCenter,
+      centerCoordinate: mapCenterCoordinate || centerCoordinate,
       currentZoom,
       onChargerSelect: setSelectedCharger,
       cameraRef,
@@ -212,21 +198,21 @@ function MapScreen() {
         amenities: filters.amenities,
       },
     }),
-    [mapCenter, currentZoom, filters]
+    [mapCenterCoordinate, currentZoom, filters, centerCoordinate]
   );
 
   return (
     <View style={styles.container}>
       <StatusBar
         barStyle="light-content"
-        backgroundColor="rgba(130, 157, 131, 0.95)"
+        backgroundColor="#000000"
         translucent={true}
       />
 
-      {/* Black status bar area */}
+      {}
       <View
         style={{
-          backgroundColor: "rgba(130, 157, 131, 0.95)",
+          backgroundColor: "#000000",
           height: insets.top,
           position: "absolute",
           top: 0,
@@ -242,10 +228,11 @@ function MapScreen() {
         styleURL="mapbox://styles/mapbox/outdoors-v11"
         onPress={dismissPopup}
         onMapIdle={handleMapChange}
+        onRegionDidChange={handleMapChange}
       >
         <MapboxGL.Camera
           ref={cameraRef}
-          centerCoordinate={mapCenter || centerCoordinate || [0, 0]}
+          centerCoordinate={centerCoordinate || [0, 0]}
         />
         {userLocation && (
           <MapboxGL.PointAnnotation
@@ -257,31 +244,29 @@ function MapScreen() {
             </View>
           </MapboxGL.PointAnnotation>
         )}
-        <EVChargerDetails {...evChargerDetailsProps} />
+        <EVChargerDetails
+          centerCoordinate={evChargerDetailsProps.centerCoordinate}
+          currentZoom={evChargerDetailsProps.currentZoom}
+          onChargerSelect={evChargerDetailsProps.onChargerSelect}
+          cameraRef={evChargerDetailsProps.cameraRef}
+          filters={{
+            chargingSpeed: evChargerDetailsProps.filters.chargingSpeed,
+            minRating: evChargerDetailsProps.filters.minRating,
+            brand: evChargerDetailsProps.filters.brand,
+            amenities: evChargerDetailsProps.filters.amenities,
+          }}
+        />
       </MapboxGL.MapView>
 
-      <SafeAreaView
-        style={styles.safeArea}
-        edges={["right", "left"]} // Don't apply safe area to top/bottom
-      >
-        <View
-          style={[
-            styles.searchContainer,
-            { marginTop: insets.top + 10 }, // Adjust for status bar
-          ]}
-        >
+      <SafeAreaView style={styles.safeArea} edges={["right", "left"]}>
+        <View style={[styles.searchContainer, { marginTop: insets.top + 10 }]}>
           <SearchBar
             onSuggestionSelect={handleSelectSearchLocation}
             cameraRef={cameraRef}
           />
         </View>
 
-        <View
-          style={[
-            styles.amenityFilterContainer,
-            { top: insets.top + 65 }, // Adjust for status bar
-          ]}
-        >
+        <View style={[styles.amenityFilterContainer, { top: insets.top + 65 }]}>
           <MemoizedAmenityFilter
             selectedAmenities={filters.amenities}
             toggleAmenity={toggleAmenity}
@@ -332,5 +317,4 @@ function MapScreen() {
   );
 }
 
-// Export a memoized version of the component
 export default React.memo(MapScreen);
