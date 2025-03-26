@@ -18,6 +18,9 @@ export default {
       supportsTablet: true,
       infoPlist: {
         MBXAccessToken: process.env.MAPBOX_ACCESS_TOKEN,
+        NSLocationWhenInUseUsageDescription: "Show current location on map.",
+        NSLocationAlwaysAndWhenInUseUsageDescription:
+          "Show current location on map.",
       },
     },
 

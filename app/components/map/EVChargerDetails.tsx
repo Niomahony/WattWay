@@ -417,7 +417,7 @@ const EVChargerDetails = ({
 
               if (hasMatchingType) {
                 console.log(
-                  `✅ Match found: ${amenityType} at ${place.name} for charger ${charger.name}`
+                  `Match found: ${amenityType} at ${place.name} for charger ${charger.name}`
                 );
                 return true;
               }
@@ -427,7 +427,7 @@ const EVChargerDetails = ({
           });
 
           if (!hasMatchingAmenity) {
-            console.log(`❌ No matching amenity for charger ${charger.name}`);
+            console.log(`No matching amenity for charger ${charger.name}`);
           }
 
           return hasMatchingAmenity;
