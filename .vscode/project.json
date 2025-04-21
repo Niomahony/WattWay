@@ -1,0 +1,5 @@
+{
+    "project": "<your-key-here>",
+    "sonarURL": "<your-sonar-url>",
+    "token": "<your-token-here>"
+}

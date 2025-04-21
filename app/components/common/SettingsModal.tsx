@@ -92,35 +92,44 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     debounce((available, max) => {
       setRange({ availableRange: available, maxRange: max });
     }, 500),
-    []
+    [setRange]
   );
 
   const debouncedSetRating = useCallback(
     debounce((value: number) => {
       setFilters({ ...filters, minRating: value });
     }, 500),
-    []
+    [filters, setFilters]
   );
 
   // Event handlers for Range tab
-  const handleAvailableRangeChange = (value: number) => {
-    const safeValue = Number(value) || 0;
-    setAvailableRange(safeValue);
-    debouncedSetRange(safeValue, maxRange);
-  };
+  const handleAvailableRangeChange = useCallback(
+    (value: number) => {
+      const safeValue = Number(value) || 0;
+      setAvailableRange(safeValue);
+      debouncedSetRange(safeValue, maxRange);
+    },
+    [debouncedSetRange, maxRange]
+  );
 
-  const handleMaxRangeChange = (value: number) => {
-    const safeValue = Number(value) || 0;
-    setMaxRange(safeValue);
-    debouncedSetRange(availableRange, safeValue);
-  };
+  const handleMaxRangeChange = useCallback(
+    (value: number) => {
+      const safeValue = Number(value) || 0;
+      setMaxRange(safeValue);
+      debouncedSetRange(availableRange, safeValue);
+    },
+    [debouncedSetRange, availableRange]
+  );
 
   // Event handlers for Charger Settings tab
-  const handleRatingChange = (value: number) => {
-    const safeValue = Number(value) || 0;
-    setDisplayRating(safeValue);
-    debouncedSetRating(safeValue);
-  };
+  const handleRatingChange = useCallback(
+    (value: number) => {
+      const safeValue = Number(value) || 0;
+      setDisplayRating(safeValue);
+      debouncedSetRating(safeValue);
+    },
+    [debouncedSetRating]
+  );
 
   // Reset tab state when modal is opened
   React.useEffect(() => {

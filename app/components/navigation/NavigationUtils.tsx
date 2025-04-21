@@ -60,20 +60,20 @@ export const getRouteDetails = async (
       .map((coord) => `${coord.longitude},${coord.latitude}`)
       .join(";")}?access_token=${mapboxAccessToken}&geometries=geojson`;
 
-    console.log("🗺️ Fetching route from Mapbox:", url);
+    console.log("Fetching route from Mapbox:", url);
 
     const response = await fetch(url);
     const data = await response.json();
 
     if (!data.routes || data.routes.length === 0) {
-      console.error("❌ No valid routes returned from Mapbox.");
+      console.error("No valid routes returned from Mapbox.");
       return null;
     }
 
-    console.log("✅ Route fetched successfully.");
+    console.log("Route fetched successfully.");
     return data.routes[0];
   } catch (error) {
-    console.error("❌ Error fetching route details:", error);
+    console.error("Error fetching route details:", error);
     return null;
   }
 };
@@ -92,14 +92,14 @@ export const getAlternativeRoute = async (coordinates: Coordinate[]) => {
     const data = await response.json();
 
     if (!data.routes || data.routes.length < 2) {
-      console.error("❌ No alternative routes found.");
+      console.error("No alternative routes found.");
       return null;
     }
 
-    console.log("✅ Alternative routes found.");
+    console.log("Alternative routes found.");
     return data.routes[1];
   } catch (error) {
-    console.error("❌ Error fetching alternative routes:", error);
+    console.error("Error fetching alternative routes:", error);
     return null;
   }
 };
@@ -276,7 +276,7 @@ const scoredSelection = (
   });
 
   console.log(
-    "🔌 Selected charger:",
+    "Selected charger:",
     scoredChargers[0].charger.name || "Unnamed Charger"
   );
   return scoredChargers[0].charger;

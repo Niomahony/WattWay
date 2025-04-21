@@ -11,6 +11,9 @@ const brandMapping: { [key: string]: string } = {
   EVBox: "evbox",
 };
 
+/**
+ * Fetches detailed information about a place using its ID.
+ */
 export async function fetchPlaceDetails(placeId: string) {
   try {
     // First try Google Places API
@@ -54,6 +57,9 @@ export async function fetchPlaceDetails(placeId: string) {
   }
 }
 
+/**
+ * Returns location suggestions based on search query text.
+ */
 export async function fetchSuggestions(searchQuery: string) {
   try {
     // First try Google Places API for better results
@@ -91,6 +97,9 @@ export async function fetchSuggestions(searchQuery: string) {
   }
 }
 
+/**
+ * Gets place details from latitude and longitude coordinates.
+ */
 export async function fetchPlaceDetailsByCoordinates(lat: number, lng: number) {
   try {
     // First try Google Places API
@@ -130,6 +139,9 @@ export async function fetchPlaceDetailsByCoordinates(lat: number, lng: number) {
   }
 }
 
+/**
+ * Calculates driving distance and duration between two coordinates.
+ */
 export async function calculateDrivingDistanceAndTime(
   origin: [number, number],
   destination: [number, number]
@@ -214,6 +226,9 @@ export async function calculateDrivingDistanceAndTime(
   }
 }
 
+/**
+ * Finds EV charging stations along a specified route with waypoints.
+ */
 export const fetchEVChargersAlongRoute = async (
   waypoints: { latitude: number; longitude: number }[],
   radius: number = 5000,
@@ -234,7 +249,7 @@ export const fetchEVChargersAlongRoute = async (
       let url = `https://api.tomtom.com/search/2/categorySearch/electric%20vehicle%20station.json?key=${chargerApiKey}&lat=${waypoint.latitude}&lon=${waypoint.longitude}&radius=${radius}&limit=20`;
 
       if (filters.availableOnly) {
-        console.log("🔌 Filtering for available chargers only along route");
+        console.log("Filtering for available chargers only along route");
         url += `&chargingAvailability=true`;
       } else {
         console.log(
@@ -283,14 +298,12 @@ export const fetchEVChargersAlongRoute = async (
       new Map(allChargers.map((charger) => [charger.id, charger])).values()
     );
 
-    console.log(
-      `✅ Found ${uniqueChargers.length} unique chargers along route`
-    );
+    console.log(`Found ${uniqueChargers.length} unique chargers along route`);
 
     let filteredChargers = uniqueChargers;
 
     if (filters && filters.brand && filters.brand.length > 0) {
-      console.log(`🔍 Filtering for brands: ${filters.brand.join(", ")}`);
+      console.log(`Filtering for brands: ${filters.brand.join(", ")}`);
       const apiCompatibleBrands = filters.brand.map(
         (brand: string) => brandMapping[brand] || brand
       );
@@ -317,7 +330,7 @@ export const fetchEVChargersAlongRoute = async (
 
           if (matches) {
             console.log(
-              `✅ Match found: "${charger.operator}" matches "${brand}"`
+              `Match found: "${charger.operator}" matches "${brand}"`
             );
           }
 
@@ -332,12 +345,12 @@ export const fetchEVChargersAlongRoute = async (
       );
     }
 
-    console.log(`✅ ${filteredChargers.length} chargers after filtering`);
+    console.log(` ${filteredChargers.length} chargers after filtering`);
 
     if (filteredChargers.length === 0) {
-      console.log("⚠️ No chargers found via TomTom API.");
+      console.log("No chargers found via TomTom API.");
 
-      console.log("🔄 Trying generic EV charger search as fallback...");
+      console.log("Trying generic EV charger search as fallback...");
 
       const searchTerms = [
         "charging station",
@@ -347,7 +360,7 @@ export const fetchEVChargersAlongRoute = async (
         "supercharger",
       ];
 
-      console.log(`🔍 Using fallback search terms: ${searchTerms.join(", ")}`);
+      console.log(`Using fallback search terms: ${searchTerms.join(", ")}`);
 
       const allFallbackChargers: any[] = [];
 
@@ -367,7 +380,7 @@ export const fetchEVChargersAlongRoute = async (
             const results = data.results || [];
 
             console.log(
-              `📍 Found ${
+              `Found ${
                 results.length
               } results for "${term}" near (${waypoint.latitude.toFixed(
                 5
@@ -417,7 +430,7 @@ export const fetchEVChargersAlongRoute = async (
               categories: poi.poi?.categories || [],
             }));
           } catch (error) {
-            console.error(`❌ Error in fallback search for "${term}":`, error);
+            console.error(`Error in fallback search for "${term}":`, error);
             return [];
           }
         });
@@ -438,7 +451,7 @@ export const fetchEVChargersAlongRoute = async (
       const uniqueFallbackChargers = Array.from(uniquePositions.values());
 
       console.log(
-        `✅ Found ${uniqueFallbackChargers.length} unique chargers in fallback search`
+        `Found ${uniqueFallbackChargers.length} unique chargers in fallback search`
       );
 
       return uniqueFallbackChargers;
@@ -446,7 +459,7 @@ export const fetchEVChargersAlongRoute = async (
 
     return filteredChargers;
   } catch (error) {
-    console.error("❌ Error fetching EV chargers along route:", error);
+    console.error("Error fetching EV chargers along route:", error);
     console.error(error);
 
     return [];
@@ -470,6 +483,9 @@ type Charger = {
   rating?: number;
 };
 
+/**
+ * Searches for EV chargers around a specific location with optional filters.
+ */
 export async function fetchEVChargers(
   center: [number, number],
   filters: {
@@ -493,7 +509,7 @@ export async function fetchEVChargers(
         (brand: string) => brandMapping[brand] || brand
       );
       console.log(
-        `🔄 Using brand filter: ${filters.brand.join(
+        `Using brand filter: ${filters.brand.join(
           ", "
         )} → ${apiCompatibleBrands.join(", ")}`
       );
@@ -507,13 +523,13 @@ export async function fetchEVChargers(
     }
     if (filters.availableOnly) {
       console.log(
-        "⚠️ Filtering for available chargers only is not supported in the free TomTom API"
+        "Filtering for available chargers only is not supported in the free TomTom API"
       );
       console.log(
         "    The availability toggle was enabled but will have no effect"
       );
     } else {
-      console.log("🔌 Showing all chargers (available and unavailable)");
+      console.log("Showing all chargers (available and unavailable)");
     }
 
     console.log("Fetching chargers with URL:", url);
@@ -566,18 +582,18 @@ export async function fetchEVChargers(
 
               if (hasMatchingAmenities) {
                 console.log(
-                  `✅ Charger ${charger.poi.name} has matching amenities nearby`
+                  `Charger ${charger.poi.name} has matching amenities nearby`
                 );
                 return { ...charger, nearbyPlaces };
               } else {
                 console.log(
-                  `⚠️ Charger ${charger.poi.name} has nearby places but none match our amenity types`
+                  `Charger ${charger.poi.name} has nearby places but none match our amenity types`
                 );
                 return null;
               }
             } else {
               console.log(
-                `❌ Charger ${charger.poi.name} has no matching amenities nearby`
+                `Charger ${charger.poi.name} has no matching amenities nearby`
               );
               return null;
             }
@@ -626,11 +642,14 @@ export async function fetchEVChargers(
       return formattedCharger;
     });
   } catch (error) {
-    console.error("❌ Error fetching EV chargers:", error);
+    console.error("Error fetching EV chargers:", error);
     return [];
   }
 }
 
+/**
+ * Checks for nearby amenities around a specific location.
+ */
 export const checkNearbyAmenities = async (
   lat: number,
   lon: number,
@@ -729,12 +748,12 @@ export const checkNearbyAmenities = async (
 
         return placesWithMatchingAmenities;
       } catch (error) {
-        console.error(`❌ Error processing place:`, error);
+        console.error(`Error processing place:`, error);
         return [];
       }
     } catch (error) {
       console.error(
-        `❌ Error checking nearby amenities (Attempt ${attempt + 1}):`,
+        `Error checking nearby amenities (Attempt ${attempt + 1}):`,
         error
       );
       if (attempt === retries) return [];

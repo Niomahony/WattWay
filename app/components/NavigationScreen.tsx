@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
   Alert,
@@ -89,6 +89,21 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
     operator?: string;
   } | null>(null);
 
+  // Add charger cache
+  const chargerCache = useRef<{
+    [key: string]: {
+      chargers: any[];
+      timestamp: number;
+    };
+  }>({});
+  const CACHE_LIFETIME = 5 * 60 * 1000; // 5 minutes
+
+  const getCacheKey = (points: Coordinate[], radius: number) => {
+    return (
+      points.map((p) => `${p.latitude},${p.longitude}`).join("|") + `|${radius}`
+    );
+  };
+
   useEffect(() => {
     if (coordinates) {
       planChargingStops();
@@ -113,7 +128,7 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
         return null;
       }
 
-      console.log("✅ Route fetched successfully.");
+      console.log("Route fetched successfully.");
       return data.routes[0];
     } catch (error) {
       console.error("Error fetching route details:", error);
@@ -140,7 +155,7 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
       for (let i = 0; i < waypoints.length; i++) {
         const waypoint = waypoints[i];
         console.log(
-          `🔍 Searching waypoint ${i + 1}: (${waypoint.latitude}, ${
+          `Searching waypoint ${i + 1}: (${waypoint.latitude}, ${
             waypoint.longitude
           })`
         );
@@ -169,7 +184,7 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
       console.log(`Total unique chargers found: ${uniqueChargers.length}`);
 
       if (uniqueChargers.length === 0) {
-        console.log("❌ No suitable chargers found");
+        console.log("No suitable chargers found");
         setIsSearchingChargers(false);
         return;
       }
@@ -227,10 +242,10 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
         setIsRangeSufficient(false);
         setShowRangeMessage(true);
       } else {
-        console.log("❌ No suitable charger found");
+        console.log("No suitable charger found");
       }
     } catch (error) {
-      console.error("❌ Error finding optimal charger:", error);
+      console.error("Error finding optimal charger:", error);
     } finally {
       setIsSearchingChargers(false);
     }
@@ -254,7 +269,7 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
   const planChargingStops = async () => {
     try {
       if (!coordinates) {
-        console.error("🚨 Error: Missing coordinates for route planning.");
+        console.error("Error: Missing coordinates for route planning.");
         return;
       }
 
@@ -285,72 +300,119 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
         return;
       }
 
+      // Step 1: Find a charger within the current available range
+      const initialSearchRadius = Math.min(
+        (availableRange !== undefined ? availableRange : 10) * 1000,
+        10000
+      );
       console.log(
-        `Insufficient Range: Route is ${Math.round(
-          routeDistance
-        )}km, exceeds available range of ${availableRange}km.`
+        `Step 1: Searching for initial charger within ${
+          initialSearchRadius / 1000
+        }km radius`
       );
 
-      // Initialize route with charging stops
-      let currentRoute = [...coordinates];
-      let currentChargingStops: any[] = [];
-      let currentChargerIndex = 0;
+      const initialChargers = await fetchEVChargersAlongRoute(
+        [coordinates[0]],
+        initialSearchRadius,
+        filters
+      );
 
-      // Function to check if a segment is within max range
-      const isSegmentWithinRange = (
-        start: Coordinate,
-        end: Coordinate
-      ): boolean => {
-        const distance = calculateDistance(
-          start.latitude,
-          start.longitude,
-          end.latitude,
-          end.longitude
+      if (initialChargers.length === 0) {
+        Alert.alert(
+          "No Chargers Found",
+          "No charging stations found within your current range. Please charge your vehicle before starting this route."
         );
-        return distance <= (maxRange || availableRange || 300);
+        setIsCalculatingRoute(false);
+        return;
+      }
+
+      // Find the closest charger to the start point
+      const closestCharger = initialChargers.reduce((closest, current) => {
+        const closestDist = calculateDistance(
+          coordinates[0].latitude,
+          coordinates[0].longitude,
+          closest.lat,
+          closest.lng
+        );
+        const currentDist = calculateDistance(
+          coordinates[0].latitude,
+          coordinates[0].longitude,
+          current.lat,
+          current.lng
+        );
+        return currentDist < closestDist ? current : closest;
+      });
+
+      // Add the initial charger to the route
+      const initialChargerCoord = {
+        latitude: closestCharger.lat,
+        longitude: closestCharger.lng,
       };
+
+      // Step 2: Now plan the rest of the route assuming we're at max range
+      console.log(
+        "Step 2: Planning remaining route from initial charger with max range"
+      );
+
+      // Calculate distance from initial charger to destination
+      const distanceToDestination = calculateDistance(
+        initialChargerCoord.latitude,
+        initialChargerCoord.longitude,
+        coordinates[coordinates.length - 1].latitude,
+        coordinates[coordinates.length - 1].longitude
+      );
+
+      console.log(
+        `Distance from initial charger to destination: ${Math.round(
+          distanceToDestination
+        )}km`
+      );
+
+      // If we can reach the destination from the initial charger with max range, we're done
+      if (distanceToDestination <= (maxRange || 300)) {
+        console.log(
+          "Can reach destination from initial charger with max range"
+        );
+        setRouteWithStops([
+          coordinates[0],
+          initialChargerCoord,
+          coordinates[coordinates.length - 1],
+        ]);
+        setIsRangeSufficient(false);
+        setShowRangeMessage(true);
+        return;
+      }
+
+      // Otherwise, we need to find additional chargers
+      console.log("Need additional chargers to reach destination");
 
       // Function to find the best charger for a segment
       const findChargerForSegment = async (
         start: Coordinate,
-        end: Coordinate
+        end: Coordinate,
+        searchRadius: number,
+        excludedChargers: Set<string> = new Set()
       ) => {
-        const SEARCH_RADIUS = Math.min(
-          30000,
-          (maxRange || availableRange || 300) * 400
+        const routePoints = await getPointsAlongRoute(start, end);
+        console.log(
+          `Searching for chargers along route with ${routePoints.length} points`
         );
 
-        // Calculate multiple points along the segment
-        const NUM_POINTS = 5; // Check 5 points along the segment
-        const searchPoints: Coordinate[] = [];
-
-        for (let i = 0; i < NUM_POINTS; i++) {
-          const t = i / (NUM_POINTS - 1);
-          searchPoints.push({
-            latitude: start.latitude + (end.latitude - start.latitude) * t,
-            longitude: start.longitude + (end.longitude - start.longitude) * t,
-          });
-        }
-
-        // Search for chargers at each point with delay between calls
         let allChargers: any[] = [];
-        for (const point of searchPoints) {
-          console.log(
-            `Searching for chargers at point: (${point.latitude}, ${point.longitude})`
-          );
-
-          // Add delay between API calls (1 second)
-          if (allChargers.length > 0) {
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-          }
-
+        for (const point of routePoints) {
           try {
+            console.log(
+              `Searching for chargers at point: (${point.latitude}, ${point.longitude})`
+            );
             const chargers = await fetchEVChargersAlongRoute(
               [point],
-              SEARCH_RADIUS,
-              filters
+              searchRadius,
+              filters || {}
             );
-            allChargers.push(...chargers);
+            allChargers = [...allChargers, ...chargers];
+
+            // Add delay between API calls to prevent rate limiting
+            await new Promise((resolve) => setTimeout(resolve, 1000));
           } catch (error: any) {
             if (error?.status === 429) {
               console.log("Rate limit hit, waiting 5 seconds before retry...");
@@ -358,174 +420,151 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
               // Retry once after waiting
               const chargers = await fetchEVChargersAlongRoute(
                 [point],
-                SEARCH_RADIUS,
-                filters
+                searchRadius,
+                filters || {}
               );
-              allChargers.push(...chargers);
+              allChargers = [...allChargers, ...chargers];
             } else {
               console.error("Error fetching chargers:", error);
             }
           }
         }
 
-        // Remove duplicate chargers
-        const uniqueChargers = Array.from(
-          new Map(
-            allChargers.map((charger) => [
-              `${charger.lat},${charger.lng}`,
-              charger,
-            ])
-          ).values()
-        );
-
-        console.log(
-          `Found ${uniqueChargers.length} unique chargers along segment`
+        // Remove duplicates and excluded chargers
+        const uniqueChargers = allChargers.filter(
+          (charger, index, self) =>
+            index ===
+              self.findIndex(
+                (c) => c.lat === charger.lat && c.lng === charger.lng
+              ) && !excludedChargers.has(`${charger.lat},${charger.lng}`)
         );
 
         if (uniqueChargers.length === 0) {
-          console.log("No chargers found at any point along the segment");
           return null;
         }
 
-        // Find the best charger among all unique chargers
-        const bestCharger = selectBestCharger(
-          uniqueChargers,
-          start,
-          end,
-          maxRange || availableRange || 300,
-          calculateDistance(
+        // Score and sort chargers
+        const scoredChargers = uniqueChargers.map((charger) => {
+          const distanceFromStart = calculateDistance(
             start.latitude,
             start.longitude,
+            charger.lat,
+            charger.lng
+          );
+          const distanceToEnd = calculateDistance(
+            charger.lat,
+            charger.lng,
             end.latitude,
             end.longitude
-          )
-        );
-
-        if (bestCharger) {
-          console.log(
-            `Found best charger: ${bestCharger.name || "Unnamed"} at (${
-              bestCharger.lat
-            }, ${bestCharger.lng})`
           );
-        } else {
-          console.log("No suitable charger found among the available chargers");
-        }
 
-        return bestCharger;
-      };
+          // Prefer chargers that are:
+          // 1. Within range of both start and end
+          // 2. Closer to the midpoint of the route
+          // 3. Have better availability
+          const midpoint = {
+            latitude: (start.latitude + end.latitude) / 2,
+            longitude: (start.longitude + end.longitude) / 2,
+          };
+          const distanceToMidpoint = calculateDistance(
+            charger.lat,
+            charger.lng,
+            midpoint.latitude,
+            midpoint.longitude
+          );
 
-      // Function to plan charging stops for a route segment
-      const planSegmentChargingStops = async (
-        start: Coordinate,
-        end: Coordinate,
-        depth: number = 0,
-        maxDepth: number = 5 // Prevent infinite recursion
-      ): Promise<Coordinate[]> => {
-        // If we've reached max depth or the segment is within range, return the segment
-        if (depth >= maxDepth || isSegmentWithinRange(start, end)) {
-          return [start, end];
-        }
+          const maxRangeMeters = (maxRange || 300) * 1000;
+          const isWithinRange =
+            distanceFromStart <= maxRangeMeters &&
+            distanceToEnd <= maxRangeMeters;
 
-        // Add delay between recursive calls (2 seconds)
-        if (depth > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-        }
+          const availabilityScore =
+            charger.availability === "AVAILABLE" ? 1 : 0.5;
+          const rangeScore = isWithinRange ? 1 : 0.5;
+          const midpointScore = 1 - distanceToMidpoint / (maxRangeMeters * 2);
 
-        console.log(`Planning segment ${depth + 1}/${maxDepth}:`, {
-          start: `${start.latitude},${start.longitude}`,
-          end: `${end.latitude},${end.longitude}`,
-          distance: Math.round(
-            calculateDistance(
-              start.latitude,
-              start.longitude,
-              end.latitude,
-              end.longitude
-            )
-          ),
+          return {
+            ...charger,
+            score:
+              availabilityScore * 0.4 + rangeScore * 0.4 + midpointScore * 0.2,
+          };
         });
 
-        const charger = await findChargerForSegment(start, end);
-        if (!charger) {
-          console.log("No suitable charger found, returning direct segment");
-          return [start, end];
+        scoredChargers.sort((a, b) => b.score - a.score);
+        return scoredChargers[0];
+      };
+
+      // Find additional chargers needed to complete the journey
+      let currentPosition = initialChargerCoord;
+      let remainingRoute = [
+        currentPosition,
+        coordinates[coordinates.length - 1],
+      ];
+      let chargingStops = [closestCharger];
+      let excludedChargers = new Set([
+        `${closestCharger.lat},${closestCharger.lng}`,
+      ]);
+
+      while (true) {
+        const distanceToDestination = calculateDistance(
+          currentPosition.latitude,
+          currentPosition.longitude,
+          coordinates[coordinates.length - 1].latitude,
+          coordinates[coordinates.length - 1].longitude
+        );
+
+        if (distanceToDestination <= (maxRange || 300)) {
+          console.log("Can reach destination from current position");
+          break;
         }
 
-        const chargerCoord = {
-          latitude: charger.lat,
-          longitude: charger.lng,
+        console.log(
+          `Need additional charger, ${Math.round(
+            distanceToDestination
+          )}km remaining`
+        );
+
+        const nextCharger = await findChargerForSegment(
+          currentPosition,
+          coordinates[coordinates.length - 1],
+          (maxRange || 300) * 1000,
+          excludedChargers
+        );
+
+        if (!nextCharger) {
+          console.log("No suitable charger found to complete journey");
+          break;
+        }
+
+        const nextChargerCoord = {
+          latitude: nextCharger.lat,
+          longitude: nextCharger.lng,
         };
 
-        // Calculate distances to verify charger placement
-        const distanceToCharger = calculateDistance(
-          start.latitude,
-          start.longitude,
-          chargerCoord.latitude,
-          chargerCoord.longitude
-        );
+        chargingStops.push(nextCharger);
+        excludedChargers.add(`${nextCharger.lat},${nextCharger.lng}`);
+        currentPosition = nextChargerCoord;
 
-        const distanceFromCharger = calculateDistance(
-          chargerCoord.latitude,
-          chargerCoord.longitude,
-          end.latitude,
-          end.longitude
-        );
-
-        console.log("Charger placement distances:", {
-          toCharger: Math.round(distanceToCharger),
-          fromCharger: Math.round(distanceFromCharger),
-          maxRange: maxRange || availableRange || 300,
-        });
-
-        // Check if we need additional charging stops for either segment
-        let firstSegment = [start, chargerCoord];
-        let secondSegment = [chargerCoord, end];
-
-        // If the first segment is too long, plan additional stops
-        if (!isSegmentWithinRange(start, chargerCoord)) {
-          console.log("First segment needs additional charging stops");
-          firstSegment = await planSegmentChargingStops(
-            start,
-            chargerCoord,
-            depth + 1,
-            maxDepth
-          );
-        }
-
-        // If the second segment is too long, plan additional stops
-        if (!isSegmentWithinRange(chargerCoord, end)) {
-          console.log("Second segment needs additional charging stops");
-          secondSegment = await planSegmentChargingStops(
-            chargerCoord,
-            end,
-            depth + 1,
-            maxDepth
-          );
-        }
-
-        // Combine segments, removing duplicate charger coordinate
-        const combinedRoute = [...firstSegment, ...secondSegment.slice(1)];
-
-        console.log(`Planned route with ${combinedRoute.length} points`);
-        return combinedRoute;
-      };
-
-      // Plan charging stops for the entire route
-      console.log("Starting route planning...");
-      const routeWithChargingStops = await planSegmentChargingStops(
-        coordinates[0],
-        coordinates[coordinates.length - 1]
-      );
-
-      console.log(`Final route has ${routeWithChargingStops.length} points`);
-
-      // Update the route with charging stops
-      setRouteWithStops(routeWithChargingStops);
-
-      // If we added any charging stops, show the range message
-      if (routeWithChargingStops.length > coordinates.length) {
-        setIsRangeSufficient(false);
-        setShowRangeMessage(true);
+        // Add delay between charger searches
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
+
+      // Build the final route with all charging stops
+      const finalRoute = [
+        coordinates[0],
+        ...chargingStops.map((charger) => ({
+          latitude: charger.lat,
+          longitude: charger.lng,
+        })),
+        coordinates[coordinates.length - 1],
+      ];
+
+      console.log(
+        `Final route has ${finalRoute.length} points with ${chargingStops.length} charging stops`
+      );
+      setRouteWithStops(finalRoute);
+      setIsRangeSufficient(false);
+      setShowRangeMessage(true);
     } catch (error) {
       console.error("Error calculating route:", error);
       Alert.alert("Error", "Could not calculate route.");
@@ -670,13 +709,9 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
 
       // Extract points along the route
       const routePoints: [number, number][] = routeWithStops.map((point) => [
-        point.longitude, // Longitude first for Mapbox
+        point.longitude,
         point.latitude,
       ]);
-
-      console.log(
-        `Fetching chargers along route with ${routePoints.length} points`
-      );
 
       // Calculate total route distance (for reference)
       const totalRouteDistance = routeWithStops.reduce((acc, point, index) => {
@@ -693,12 +728,72 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
 
       console.log(`Total route distance: ${Math.round(totalRouteDistance)} km`);
 
+      // Calculate dynamic search radius based on route length
+      const baseRadius = 15000;
+      const additionalRadius = Math.floor(totalRouteDistance / 200) * 5000;
+      const searchRadius = Math.min(baseRadius + additionalRadius, 30000);
+
+      console.log(`Using dynamic search radius: ${Math.round(searchRadius)}m`);
+
+      // Optimize search points based on route length
+      let searchPoints: Coordinate[] = [];
+
+      if (totalRouteDistance <= 50) {
+        searchPoints = [
+          routeWithStops[0],
+          routeWithStops[routeWithStops.length - 1],
+        ];
+      } else if (totalRouteDistance <= 200) {
+        const midIndex = Math.floor(routeWithStops.length / 2);
+        searchPoints = [
+          routeWithStops[0],
+          routeWithStops[midIndex],
+          routeWithStops[routeWithStops.length - 1],
+        ];
+      } else {
+        const numPoints = Math.min(5, Math.ceil(totalRouteDistance / 100));
+        const step = Math.floor(routeWithStops.length / (numPoints - 1));
+
+        for (let i = 0; i < numPoints; i++) {
+          const index = i * step;
+          if (index < routeWithStops.length) {
+            searchPoints.push(routeWithStops[index]);
+          }
+        }
+
+        if (!searchPoints.includes(routeWithStops[routeWithStops.length - 1])) {
+          searchPoints.push(routeWithStops[routeWithStops.length - 1]);
+        }
+      }
+
+      console.log(
+        `Fetching chargers along route with ${searchPoints.length} optimized search points`
+      );
+
+      // Check cache first
+      const cacheKey = getCacheKey(searchPoints, searchRadius);
+      const cachedData = chargerCache.current[cacheKey];
+      const now = Date.now();
+
+      if (cachedData && now - cachedData.timestamp < CACHE_LIFETIME) {
+        console.log("Using cached charger data");
+        setRouteChargers(cachedData.chargers);
+        setLoadingRouteChargers(false);
+        return;
+      }
+
       // Fetch chargers along the route
       const chargers = await fetchEVChargersAlongRoute(
-        routeWithStops,
-        10000, // Use a 10km search radius
+        searchPoints,
+        searchRadius,
         filters || {}
       );
+
+      // Update cache
+      chargerCache.current[cacheKey] = {
+        chargers,
+        timestamp: now,
+      };
 
       console.log(`Found ${chargers.length} chargers along route`);
 
@@ -718,18 +813,18 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
           routeWithStops[routeWithStops.length - 1].longitude
         );
 
-        const isReachable = distanceFromStart <= (availableRange || 300) * 0.95;
-
+        // More lenient range constraints
+        const isReachable = distanceFromStart <= (availableRange || 300) * 1.1; // Allow up to 110% of range
         const canCompleteJourney =
-          distanceToDestination <= (availableRange || 300) * 0.95 ||
-          distanceFromStart + distanceToDestination <= totalRouteDistance * 1.2;
+          distanceToDestination <= (availableRange || 300) * 1.1 || // Allow up to 110% of range
+          distanceFromStart + distanceToDestination <= totalRouteDistance * 1.5; // Allow up to 50% detour
 
         if (!isReachable) {
           console.log(
             `Charger at ${charger.lat},${charger.lng} is not reachable:`,
             {
               distance: `${Math.round(distanceFromStart)}km`,
-              maxRange: `${Math.round((availableRange || 300) * 0.95)}km`,
+              maxRange: `${Math.round((availableRange || 300) * 1.1)}km`,
             }
           );
         }
@@ -738,7 +833,7 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
             `Cannot complete journey from charger at ${charger.lat},${charger.lng}:`,
             {
               distance: `${Math.round(distanceToDestination)}km`,
-              maxRange: `${Math.round((availableRange || 300) * 0.95)}km`,
+              maxRange: `${Math.round((availableRange || 300) * 1.1)}km`,
               totalRouteDistance: `${Math.round(totalRouteDistance)}km`,
             }
           );
@@ -810,6 +905,24 @@ export default function NavigationScreen({ route }: NavigationScreenProps) {
     } finally {
       setLoadingRouteChargers(false);
     }
+  };
+
+  const getPointsAlongRoute = async (
+    start: Coordinate,
+    end: Coordinate
+  ): Promise<Coordinate[]> => {
+    const NUM_POINTS = 5; // Check 5 points along the segment
+    const points: Coordinate[] = [];
+
+    for (let i = 0; i < NUM_POINTS; i++) {
+      const t = i / (NUM_POINTS - 1);
+      points.push({
+        latitude: start.latitude + (end.latitude - start.latitude) * t,
+        longitude: start.longitude + (end.longitude - start.longitude) * t,
+      });
+    }
+
+    return points;
   };
 
   return (

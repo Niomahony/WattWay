@@ -22,6 +22,12 @@ export default {
         NSLocationAlwaysAndWhenInUseUsageDescription:
           "Show current location on map.",
       },
+      entitlements: {
+        "aps-environment": "production",
+      },
+      capabilities: {
+        "Push Notifications": true,
+      },
     },
 
     android: {
